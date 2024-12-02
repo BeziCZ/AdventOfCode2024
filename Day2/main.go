@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func readInput(path string) [][]int {
@@ -62,11 +63,12 @@ func isReportSafe(distances []int) bool {
 	return descOrAsc && allWithinBoundaries
 }
 func main() {
-	matrix := readInput("/home/bezi/Projects/AdventOfCode/Day2/testinput.txt")
+	matrix := readInput("/home/bezi/Projects/AdventOfCode/Day2/input.txt")
 
 	numOfSafe1 := 0
 	numOfSafe2 := 0
 	// Part 1
+	start := time.Now()
 	for _, row := range matrix {
 		distances := make([]int, 0)
 		for i := 0; i < len(row)-1; i++ {
@@ -76,32 +78,35 @@ func main() {
 			numOfSafe1++
 		}
 	}
+	elapsed := time.Since(start)
+	fmt.Println("Part 1 took: ", elapsed)
 	// Part 2
+	start = time.Now()
 	for _, row := range matrix {
 		distances := make([]int, 0)
 		for i := 0; i < len(row)-1; i++ {
 			distances = append(distances, int(row[i])-int(row[i+1]))
 		}
-		fmt.Println("Testing report: ", row)
-		fmt.Println("Distances: ", distances)
 		if isReportSafe(distances) {
 			numOfSafe2++
-			fmt.Println("Safe report: ", row)
 		} else {
-			for i := 0; i < len(distances); i++ { // Go through all distances
-				fmt.Println("Index: ", i)
-				fmt.Println("Before index: ", distances[:i], "After index: ", distances[i+1:])
-				mod_distances := append(distances[:i], distances[i+1:]...) // Remove i-th element
-				fmt.Println("Modified distances: ", mod_distances)
+			for i := 0; i < len(row); i++ { // Go through all distances
+				cpy_row := make([]int, len(row))
+				mod_distances := make([]int, 0)
+				copy(cpy_row, row)
+				mod_row := append(cpy_row[:i], cpy_row[i+1:]...) // Remove element at index i
+				for j := 0; j < len(mod_row)-1; j++ {
+					mod_distances = append(mod_distances, int(mod_row[j])-int(mod_row[j+1]))
+				}
 				if isReportSafe(mod_distances) { // Check if modified distances are safe
 					numOfSafe2++ // If they are, increment the number of safe reports
-					fmt.Println("Safe report: ", row)
 					break
 				}
 			}
 		}
-		fmt.Println("-------------------------------------------------")
 	}
+	elapsed = time.Since(start)
+	fmt.Println("Part 2 took: ", elapsed)
 	fmt.Println("Part 1 number of safe reports: ", numOfSafe1)
 	fmt.Println("Part 2 number of safe reports: ", numOfSafe2)
 }
