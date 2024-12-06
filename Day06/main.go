@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -163,6 +165,7 @@ func simulateLoop(roomCopy [][]string, obstaclePos Location) bool {
 	}
 }
 
+/*
 func countPossibleLoops(originalRoom [][]string) int {
 	loopCount := 0
 
@@ -178,6 +181,31 @@ func countPossibleLoops(originalRoom [][]string) int {
 	}
 
 	return loopCount
+}*/
+
+func countPossibleLoops(originalRoom [][]string, startLine, endLine int) int {
+	loopCount := 0
+
+	for x := startLine; x < endLine; x++ {
+		for y := range originalRoom[x] {
+			if originalRoom[x][y] == "." {
+				roomCopy := copyRoom(originalRoom)
+				if simulateLoop(roomCopy, Location{x, y}) {
+					loopCount++
+				}
+			}
+		}
+	}
+
+	return loopCount
+}
+
+func worker(room [][]string, jobs <-chan [2]int, results chan<- int, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for job := range jobs {
+		startLine, endLine := job[0], job[1]
+		results <- countPossibleLoops(room, startLine, endLine)
+	}
 }
 
 func main() {
@@ -205,8 +233,39 @@ func main() {
 	fmt.Println("Part 1:", visited, "in:", elapsed)
 
 	// Part 2
+	numCPU := runtime.NumCPU()
+	runtime.GOMAXPROCS(numCPU)
+
+	jobs := make(chan [2]int, numCPU)
+	results := make(chan int, numCPU)
+	var wg sync.WaitGroup
+
+	for i := 0; i < numCPU; i++ {
+		wg.Add(1)
+		go worker(room2, jobs, results, &wg)
+	}
+
+	// Split the input data into ranges of lines
+	chunkSize := (len(room2) + numCPU - 1) / numCPU
 	start = time.Now()
-	loops := countPossibleLoops(room2)
+	for i := 0; i < len(room2); i += chunkSize {
+		end := i + chunkSize
+		if end > len(room2) {
+			end = len(room2)
+		}
+		jobs <- [2]int{i, end}
+	}
+	close(jobs)
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	loops := 0
+	for result := range results {
+		loops += result
+	}
 	elapsed = time.Since(start)
 
 	fmt.Println("Part 2:", loops, "in:", elapsed)
