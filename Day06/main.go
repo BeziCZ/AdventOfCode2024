@@ -18,8 +18,13 @@ type Location struct {
 	x int
 	y int
 }
+type State struct {
+	loc Location
+	dir Direction
+}
 
 var room [][]string
+var room2 [][]string
 var currDir Direction = Direction{-1, 0}
 var guardLoc Location
 
@@ -87,12 +92,101 @@ func makeMove() int {
 	return 0
 }
 
+func copyRoom(original [][]string) [][]string {
+	newRoom := make([][]string, len(original))
+	for i := range original {
+		newRoom[i] = make([]string, len(original[i]))
+		copy(newRoom[i], original[i])
+	}
+	return newRoom
+}
+
+func findGuard(room [][]string) (Location, bool) {
+	for i := range room {
+		for j := range room[i] {
+			if room[i][j] == "^" {
+				return Location{i, j}, true
+			}
+		}
+	}
+	return Location{-1, -1}, false
+}
+
+func simulateLoop(roomCopy [][]string, obstaclePos Location) bool {
+	if obstaclePos.x >= 0 && obstaclePos.y >= 0 {
+		roomCopy[obstaclePos.x][obstaclePos.y] = "#"
+	}
+
+	currentLoc, found := findGuard(roomCopy)
+	if !found {
+		return false
+	}
+
+	currentDir := Direction{-1, 0} // up
+	visited := make(map[State]bool)
+
+	for {
+		nextX, nextY := currentLoc.x+currentDir.x, currentLoc.y+currentDir.y
+
+		if nextX < 0 || nextX >= len(roomCopy) || nextY < 0 || nextY >= len(roomCopy[0]) {
+			return false
+		}
+
+		currentState := State{currentLoc, currentDir}
+		if visited[currentState] {
+			return true
+		}
+		visited[currentState] = true
+
+		if roomCopy[currentLoc.x][currentLoc.y] != "#" {
+			roomCopy[currentLoc.x][currentLoc.y] = "X"
+		}
+
+		if roomCopy[nextX][nextY] == "#" {
+			switch {
+			case currentDir.x == -1 && currentDir.y == 0: // facing up
+				currentDir = Direction{0, 1} // turn right
+			case currentDir.x == 0 && currentDir.y == 1: // facing right
+				currentDir = Direction{1, 0} // turn down
+			case currentDir.x == 1 && currentDir.y == 0: // facing down
+				currentDir = Direction{0, -1} // turn left
+			case currentDir.x == 0 && currentDir.y == -1: // facing left
+				currentDir = Direction{-1, 0} // turn up
+			}
+		} else {
+			currentLoc = Location{nextX, nextY}
+		}
+
+		if len(visited) > len(roomCopy)*len(roomCopy[0])*4 {
+			return false
+		}
+	}
+}
+
+func countPossibleLoops(originalRoom [][]string) int {
+	loopCount := 0
+
+	for x := range originalRoom {
+		for y := range originalRoom[x] {
+			if originalRoom[x][y] == "." {
+				roomCopy := copyRoom(originalRoom)
+				if simulateLoop(roomCopy, Location{x, y}) {
+					loopCount++
+				}
+			}
+		}
+	}
+
+	return loopCount
+}
+
 func main() {
 	path := "input.txt"
 	room = readInput(path)
-
+	room2 = readInput(path)
 	// Part 1
 	// Find the guard's init location
+
 	for x, row := range room {
 		if slices.Contains(row, "^") {
 			guardLoc = Location{x, slices.Index(row, "^")}
@@ -107,9 +201,13 @@ func main() {
 	}
 	elapsed := time.Since(start)
 
-	for _, row := range room {
-		fmt.Println(row)
-	}
 	visited := countXs()
-	fmt.Println("Part 1: ", visited, "in:", elapsed)
+	fmt.Println("Part 1:", visited, "in:", elapsed)
+
+	// Part 2
+	start = time.Now()
+	loops := countPossibleLoops(room2)
+	elapsed = time.Since(start)
+
+	fmt.Println("Part 2:", loops, "in:", elapsed)
 }
